@@ -6,38 +6,54 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install dependencies
         run: npm install
 
-      - name: Install Expo CLI
-        run: npm install -g @expo/cli
-
-      - name: Prebuild Android
+      - name: Expo Prebuild
         run: npx expo prebuild --platform android --clean
+
+      - name: Fix Expo plugin path in settings.gradle
+        run: |
+          PLUGIN=$(node -e "
+            try {
+              const p = require.resolve('@expo/cli/package.json');
+              const path = require('path');
+              const d1 = path.resolve(p, '../build/gradle-plugin');
+              const d2 = path.resolve(p, '../../packages/@expo/cli/build/gradle-plugin');
+              const fs = require('fs');
+              if(fs.existsSync(d1)) console.log(d1);
+              else if(fs.existsSync(d2)) console.log(d2);
+              else console.log('');
+            } catch(e) { console.log(''); }
+          " 2>/dev/null)
+          if [ -n "$PLUGIN" ] && [ -d "$PLUGIN" ]; then
+            echo "Patching settings.gradle with plugin path: $PLUGIN"
+            sed -i "s|includeBuild(new File.*)|includeBuild('$PLUGIN')|g" android/settings.gradle
+          fi
+          echo "=== settings.gradle ==="
+          head -20 android/settings.gradle
+
+      - name: Set local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build Debug APK
-        run: cd android && ./gradlew assembleDebug --no-daemon
+        run: cd android && ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
