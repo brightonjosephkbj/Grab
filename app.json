@@ -30,15 +30,12 @@
     "plugins": [
       "expo-av",
       "expo-media-library",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true,
-            "allowBackup": false
-          }
+      ["expo-build-properties", {
+        "android": {
+          "usesCleartextTraffic": true,
+          "minSdkVersion": 24
         }
-      ]
+      }]
     ]
   }
 }

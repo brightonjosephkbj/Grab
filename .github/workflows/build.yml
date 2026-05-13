@@ -25,27 +25,6 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform android --clean
 
-      - name: Fix Expo plugin path in settings.gradle
-        run: |
-          PLUGIN=$(node -e "
-            try {
-              const p = require.resolve('@expo/cli/package.json');
-              const path = require('path');
-              const d1 = path.resolve(p, '../build/gradle-plugin');
-              const d2 = path.resolve(p, '../../packages/@expo/cli/build/gradle-plugin');
-              const fs = require('fs');
-              if(fs.existsSync(d1)) console.log(d1);
-              else if(fs.existsSync(d2)) console.log(d2);
-              else console.log('');
-            } catch(e) { console.log(''); }
-          " 2>/dev/null)
-          if [ -n "$PLUGIN" ] && [ -d "$PLUGIN" ]; then
-            echo "Patching settings.gradle with plugin path: $PLUGIN"
-            sed -i "s|includeBuild(new File.*)|includeBuild('$PLUGIN')|g" android/settings.gradle
-          fi
-          echo "=== settings.gradle ==="
-          head -20 android/settings.gradle
-
       - name: Set local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
@@ -53,7 +32,10 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build Debug APK
-        run: cd android && ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=512m"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
