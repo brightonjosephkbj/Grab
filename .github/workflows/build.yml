@@ -25,6 +25,22 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform android --clean
 
+      - name: Fix settings.gradle plugin path
+        run: |
+          PLUGIN=$(find /home/runner/work -path "*/node_modules/@expo/cli/build/gradle-plugin" -type d 2>/dev/null | head -1)
+          if [ -z "$PLUGIN" ]; then
+            PLUGIN=$(find /home/runner/work -path "*/packages/@expo/cli/build/gradle-plugin" -type d 2>/dev/null | head -1)
+          fi
+          if [ -z "$PLUGIN" ]; then
+            PLUGIN=$(find $(npm root -g) -path "*/@expo/cli/build/gradle-plugin" -type d 2>/dev/null | head -1)
+          fi
+          echo "Found plugin at: $PLUGIN"
+          if [ -n "$PLUGIN" ]; then
+            sed -i "s|includeBuild(new File.*)|includeBuild('$PLUGIN')|g" android/settings.gradle
+          fi
+          echo "--- settings.gradle top ---"
+          head -15 android/settings.gradle
+
       - name: Set local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
@@ -34,7 +50,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --info \
+          ./gradlew assembleDebug --no-daemon \
             -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=512m"
 
       - name: Upload APK
