@@ -22,6 +22,42 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Inject pluginManagement into settings.gradle
+        run: |
+          # Find expo-modules-core android path
+          CORE=$(node -e "const p=require.resolve('expo-modules-core/package.json');const path=require('path');console.log(path.dirname(p))")
+          echo "expo-modules-core: $CORE"
+
+          # Try gradle-plugin subdir first, fallback to android
+          if [ -f "$CORE/android/gradle-plugin/build.gradle" ]; then
+            PLUGIN="$CORE/android/gradle-plugin"
+          elif [ -f "$CORE/android/build.gradle" ]; then
+            PLUGIN="$CORE/android"
+          else
+            echo "WARNING: Could not find plugin dir"
+            PLUGIN="$CORE/android"
+          fi
+          echo "Using plugin path: $PLUGIN"
+
+          # Prepend pluginManagement block to settings.gradle
+          TEMP=$(mktemp)
+          cat > $TEMP << BLOCK
+pluginManagement {
+    includeBuild('$PLUGIN')
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+BLOCK
+          cat android/settings.gradle >> $TEMP
+          mv $TEMP android/settings.gradle
+
+          echo "=== settings.gradle (first 20 lines) ==="
+          head -20 android/settings.gradle
+
       - name: Set local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
